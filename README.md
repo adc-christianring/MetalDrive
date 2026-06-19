@@ -45,4 +45,5 @@ Vollständig umgesetzt und produktiv (Published in n8n, alle Nodes erfolgreich g
 
 ## Dateien in diesem Repository
 - `workflow.json` – exportierter n8n-Workflow
+- `MetalDrive_KI_workflow.pdf` – screenshot n8n-workflow
 - `MetalDrive_KI_Abschluss.pdf` – Abschlusspräsentation (Kotter-Phasenmodell)
