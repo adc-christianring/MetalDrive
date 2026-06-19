@@ -1,0 +1,439 @@
+{
+  "name": "MetalDrive IT-Support-Agent",
+  "nodes": [
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        },
+        "filters": {
+          "labelIds": [
+            "Label_3"
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.gmailTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        -1376,
+        -320
+      ],
+      "id": "f814aa25-9cbe-4e4a-a302-b75c64fe6454",
+      "name": "Gmail Trigger",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "OATXxk3K74iHoHrm",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const email = $input.first().json;\n\nreturn [{\n  json: {\n    senderEmail: email.From,\n    subject: email.Subject,\n    body: email.snippet,\n    timestamp: new Date(parseInt(email.internalDate)).toISOString(),\n    messageId: email.id\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1200,
+        -320
+      ],
+      "id": "81feddb1-0680-4fd7-9d32-eb459f4d5707",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Du bist ein IT-Support-Assistent bei MetalDrive GmbH. Analysiere die folgende Support-Anfrage und antworte ausschließlich im JSON-Format ohne weitere Erklärungen:\n\n{\n  \"kategorie\": \"Passwort | Zugriff | Hardware | Software | Sonstiges\",\n  \"dringlichkeit\": \"Hoch | Mittel | Niedrig\",\n  \"zusammenfassung\": \"Max. 2 Sätze, sachlich\"\n}\n\nKlassifikationsregeln Dringlichkeit:\n- Hoch: Produktionsstopp möglich, mehrere Mitarbeiter betroffen, kein Workaround verfügbar\n- Mittel: Einzelperson betroffen, Workaround vorhanden, Arbeit kann fortgesetzt werden\n- Niedrig: Komfortproblem, kein Zeitdruck, keine Auswirkung auf Produktion\n\nBetreff: {{ $json.subject }}\nAnfrage: {{ $json.body }}\n\nAntworte nur auf Deutsch. Kein Text außerhalb des JSON.",
+        "batching": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [
+        -1024,
+        -320
+      ],
+      "id": "0a451ef7-5800-4741-aa8e-6dc475cedadc",
+      "name": "Basic LLM Chain"
+    },
+    {
+      "parameters": {
+        "model": "=qwen2.5:14b",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmOllama",
+      "typeVersion": 1,
+      "position": [
+        -960,
+        -128
+      ],
+      "id": "6bd28d69-78ba-4f40-802e-ad1d19de6db5",
+      "name": "Ollama Model",
+      "credentials": {
+        "ollamaApi": {
+          "id": "EH3Fsf98HBa2Yj72",
+          "name": "Ollama account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = $input.first().json.text;\n\n// JSON aus dem Text extrahieren\nconst cleaned = raw.replace(/```json|```/g, '').trim();\nconst parsed = JSON.parse(cleaned);\n\nreturn [{\n  json: {\n    kategorie: parsed.kategorie,\n    dringlichkeit: parsed.dringlichkeit,\n    zusammenfassung: parsed.zusammenfassung,\n    senderEmail: $('Code in JavaScript').first().json.senderEmail,\n    subject: $('Code in JavaScript').first().json.subject,\n    body: $('Code in JavaScript').first().json.body,\n    timestamp: $('Code in JavaScript').first().json.timestamp,\n    messageId: $('Code in JavaScript').first().json.messageId\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -688,
+        -320
+      ],
+      "id": "02ce6a7d-9b45-4ac4-bfe5-5770d29d589a",
+      "name": "Code in JavaScript1"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "e70c4493-9610-46c0-81fc-642ca4c26c48",
+              "leftValue": "={{ $json.dringlichkeit }}",
+              "rightValue": "Hoch",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -496,
+        -320
+      ],
+      "id": "20e84c24-c937-44f8-a582-cfcdd6181256",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "sendTo": "295@tuta.io",
+        "subject": "=[DRINGEND] Neue IT-Anfrage von {{ $json.senderEmail }}",
+        "emailType": "text",
+        "message": "=Dringende IT-Anfrage eingegangen.\n\nVon: {{ $json.senderEmail }}\nBetreff: {{ $json.subject }}\nKategorie: {{ $json.kategorie }}\nDringlichkeit: {{ $json.dringlichkeit }}\n\nZusammenfassung:\n{{ $json.zusammenfassung }}\n\nBitte sofort übernehmen.",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        -320,
+        -464
+      ],
+      "id": "8c9ada83-dfdc-402d-9225-59cee2a4b423",
+      "name": "Send a message",
+      "webhookId": "1a6f6fc1-b1b3-4e33-bf8a-b2dacdfb6f9b",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "OATXxk3K74iHoHrm",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1stBRere-4j8Lh0iOwnihiRCAY9o1mftFNsEpuXM5Ch8",
+          "mode": "list",
+          "cachedResultName": "MetalDrive_IT_Support_Log",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1stBRere-4j8Lh0iOwnihiRCAY9o1mftFNsEpuXM5Ch8/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1sT0j11wlOHabYEyDImGu0ntM0LOVAGRcuh4CHaBp4oU/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Ticket-ID": "=MD-{{ $now.plus({hours: 6}).toFormat('yyyyMMdd-HHmm') }}",
+            "Datum": "={{ $('Code in JavaScript1').first().json.timestamp }}",
+            "Absender": "={{ $('Code in JavaScript1').first().json.senderEmail }}",
+            "Betreff": "={{ $('Code in JavaScript1').first().json.subject }}",
+            "Kategorie": "={{ $('Code in JavaScript1').first().json.kategorie }}",
+            "Dringlichkeit": "={{ $('Code in JavaScript1').first().json.dringlichkeit }}",
+            "Zusammenfassung": "={{ $('Code in JavaScript1').first().json.zusammenfassung }}",
+            "Status": "=OFFEN",
+            "Message-ID": "={{ $('Code in JavaScript1').first().json.messageId }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Ticket-ID",
+              "displayName": "Ticket-ID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Datum",
+              "displayName": "Datum",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Absender",
+              "displayName": "Absender",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Betreff",
+              "displayName": "Betreff",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Kategorie",
+              "displayName": "Kategorie",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Dringlichkeit",
+              "displayName": "Dringlichkeit",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Zusammenfassung",
+              "displayName": "Zusammenfassung",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Status",
+              "displayName": "Status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Lösung",
+              "displayName": "Lösung",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Abgeschlossen am",
+              "displayName": "Abgeschlossen am",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Message-ID",
+              "displayName": "Message-ID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        -96,
+        -320
+      ],
+      "id": "bdba60b1-e779-4a63-9f41-d69e8a3c1bd1",
+      "name": "Append row in sheet",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "gi5YUy62jLvmvJqc",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $('Code in JavaScript1').first().json.senderEmail }}",
+        "subject": "=Deine IT-Anfrage wurde erfasst – Ticket {{ $('Append row in sheet').first().json['Ticket-ID'] }}",
+        "emailType": "text",
+        "message": "=Hallo,\n\ndeine IT-Anfrage ist bei uns eingegangen und wurde erfasst.\n\nZusammenfassung: {{ $('Code in JavaScript1').first().json.zusammenfassung }}\n\nKategorie: {{ $('Code in JavaScript1').first().json.kategorie }}\nDringlichkeit: {{ $('Code in JavaScript1').first().json.dringlichkeit }}\n\nWir melden uns so bald wie möglich bei dir.\n\nMetalDrive IT-Support",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        144,
+        -320
+      ],
+      "id": "22f0e9b5-4fdf-49bc-8b88-cddf90f4c25d",
+      "name": "Send a message1",
+      "webhookId": "f4742241-33ce-4637-8260-5b80482d936f",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "OATXxk3K74iHoHrm",
+          "name": "Gmail account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Gmail Trigger": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Basic LLM Chain",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ollama Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Basic LLM Chain",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Basic LLM Chain": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript1": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Append row in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send a message": {
+      "main": [
+        [
+          {
+            "node": "Append row in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Append row in sheet": {
+      "main": [
+        [
+          {
+            "node": "Send a message1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "85bb6798-831c-49a8-bdd5-fe146135a283",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "6907c62cafc712d7edb4551071217a4f17098dac6bb9e54fac31d9806fd0fca1"
+  },
+  "id": "fEkAOBa7bdrXBUW0",
+  "tags": []
+}
